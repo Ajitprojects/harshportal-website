@@ -1,6 +1,6 @@
 export interface Product {
-  id: number;           // Numeric ID for your components
-  docId: string;          // String ID from Firestore document
+  id: number;           // Numeric ID for components
+  docId?: string;         // String ID from Firestore
   name: string;
   price: number;
   originalPrice?: number;
@@ -8,7 +8,8 @@ export interface Product {
   category: string;
   tags: string[];
   description: string;
-  features: string[];
+  features: { title: string; desc: string }[];
   image: string;
-  gradient: string[];     // Added missing 'gradient' property
+  gradient?: string[];      // Make optional if not on all products
+  buttonColor?: string;     // Make optional if not on all products
 }

@@ -43,8 +43,8 @@ const OTTAccounts = () => {
   }, []);
 
   return (
-     <ProductPageLayout 
-      category="OTT"
+      <ProductPageLayout 
+      category="OTT Accounts" // This should match the category string in Firestore
       subCategories={['All', 'Streaming', 'Music', 'Sports']}
     />
   );

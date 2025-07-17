@@ -6,17 +6,14 @@ import ProductCardSkeleton from './ProductCardSkeleton';
 import toast from 'react-hot-toast';
 import { db } from '../firebase';
 import { collection, getDocs, query, where } from "firebase/firestore";
-import { Product } from '../types'; // <-- IMPORT the master Product type
-
-// The local Product interface has been REMOVED from this file.
+import { Product } from '../types';
 
 interface ProductPageLayoutProps {
-  category: string;
+  category: string; // We'll keep this for the title
   subCategories: string[];
 }
 
 const PageTitle = ({ category }: { category: string }) => {
-    // This component does not need changes
     const titles: { [key: string]: React.ReactNode } = {
         OTT: <><span className="bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">PREMIUM</span> <span className="block text-white">OTT ACCOUNTS</span></>,
         IPTV: <><span className="bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">PREMIUM</span> <span className="block text-white">IPTV SERVICES</span></>,
@@ -41,10 +38,23 @@ const ProductPageLayout: React.FC<ProductPageLayoutProps> = ({ category, subCate
         setError(null);
         
         const productsCollectionRef = collection(db, "products");
-        const q = query(productsCollectionRef, where("category", "==", category));
+        
+        // --- UPDATED QUERY LOGIC ---
+        // We now fetch all products whose category is IN the list of subCategories.
+        // We filter out "All" as it's for client-side filtering, not a real category.
+        const relevantCategories = subCategories.filter(sc => sc !== 'All');
+
+        if (relevantCategories.length === 0) {
+            // If no relevant categories, maybe fetch all products under the main category?
+            // For now, we'll assume this won't happen. If it does, no products will be fetched.
+             setProducts([]);
+             setIsLoading(false);
+             return;
+        }
+
+        const q = query(productsCollectionRef, where("category", "in", relevantCategories));
         
         const data = await getDocs(q);
-        // Map the Firestore data to our new master Product type
         const fetchedProducts = data.docs.map(doc => ({
             ...(doc.data() as Omit<Product, 'docId'>),
             docId: doc.id
@@ -52,22 +62,30 @@ const ProductPageLayout: React.FC<ProductPageLayoutProps> = ({ category, subCate
         setProducts(fetchedProducts);
 
       } catch (err: any) {
+        // IMPORTANT: Check the browser console for Firestore errors.
+        // It might ask you to create a database index. Click the link in the error message to create it.
         setError(err.message || "Failed to load products.");
-        toast.error("Failed to load products.");
+        toast.error("Failed to load products. Check console for details.");
+        console.error(err);
       } finally {
         setIsLoading(false);
       }
     };
     loadProducts();
-  }, [category]);
+  }, [category, subCategories]); // Depend on subCategories as well
 
   const filteredProducts = activeSubCategory === 'All'
     ? products
     : products.filter((p) => p.tags && p.tags.includes(activeSubCategory));
 
+  const parsePrice = (price: number | string): number => {
+    if (typeof price === 'number') return price;
+    return parseFloat(price.replace(/[^0-9.-]+/g,""));
+  }
+
   const sortedProducts = [...filteredProducts].sort((a, b) => {
-    if (sortOption === 'priceLow') return a.price - b.price;
-    if (sortOption === 'priceHigh') return b.price - a.price;
+    if (sortOption === 'priceLow') return parsePrice(a.price) - parsePrice(b.price);
+    if (sortOption === 'priceHigh') return parsePrice(b.price) - parsePrice(a.price);
     if (sortOption === 'nameAZ') return a.name.localeCompare(b.name);
     if (sortOption === 'nameZA') return b.name.localeCompare(a.name);
     return 0;
@@ -118,12 +136,14 @@ const ProductPageLayout: React.FC<ProductPageLayoutProps> = ({ category, subCate
             Array.from({ length: 6 }).map((_, i) => <ProductCardSkeleton key={i} />)
           ) : error ? (
             <div className="col-span-3 text-center text-red-500 text-xl py-10 bg-red-500/10 rounded-lg border border-red-500/30">{error}</div>
-          ) : (
+          ) : sortedProducts.length > 0 ? (
             <AnimatePresence>
               {sortedProducts.map((p) => (
                 <ProductCard key={p.id} product={p} onViewDetails={handleViewDetails} />
               ))}
             </AnimatePresence>
+          ) : (
+             <div className="col-span-3 text-center text-gray-400 text-xl py-10">No products found for this category.</div>
           )}
         </motion.div>
       </div>

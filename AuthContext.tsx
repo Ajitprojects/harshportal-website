@@ -1,21 +1,13 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import {
-  onAuthStateChanged,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  updateProfile,
-  User as FirebaseUser
-} from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { supabase } from '../supabase';
+// Import the necessary types from the Supabase library
+import { Session, User, AuthChangeEvent } from '@supabase/supabase-js';
 
 // --- TYPE DEFINITIONS ---
 export interface AuthUser {
-  id: number;
-  uid: string;
+  id: string; // Supabase uses UUID strings for IDs
   name: string;
   email: string;
   role: 'Admin' | 'Customer' | 'Moderator';
@@ -36,12 +28,6 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-// Using a mock map for roles during login for this example
-const mockUserRoles: { [key: string]: { id: number, role: 'Admin' | 'Customer' } } = {
-  "admin@example.com": { id: 1, role: "Admin" },
-  "customer@example.com": { id: 2, role: "Customer" }
-};
-
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -49,81 +35,85 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const userDocRef = doc(db, "users", firebaseUser.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          const customData = userDoc.data();
-          setCurrentUser({
-            id: customData.id,
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || '',
-            name: firebaseUser.displayName || customData.name,
-            role: customData.role,
-          });
+    // Listen for authentication changes from Supabase
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      // FIX: Add the correct type for the '_event' parameter
+      async (_event: AuthChangeEvent, session: Session | null) => {
+        if (session?.user) {
+          // User is logged in, fetch their profile from our 'profiles' table
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+
+          if (error) {
+            console.error("Error fetching profile:", error);
+            setCurrentUser(null);
+          } else if (profile) {
+            setCurrentUser({
+              id: profile.id,
+              name: profile.name,
+              email: profile.email,
+              role: profile.role,
+            });
+          }
+        } else {
+          // User is logged out
+          setCurrentUser(null);
         }
-      } else {
-        setCurrentUser(null);
+        setAuthLoading(false);
       }
-      setAuthLoading(false);
-    });
-    return () => unsubscribe();
+    );
+
+    // Cleanup subscription on unmount
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, pass: string): Promise<AuthUser | null> => {
     setIsLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, pass);
-      const userDocRef = doc(db, "users", userCredential.user.uid);
-      const userDoc = await getDoc(userDocRef);
-      if (userDoc.exists()) {
-        const fullUser: AuthUser = {
-          uid: userCredential.user.uid,
-          email: userCredential.user.email || '',
-          ...userDoc.data()
-        } as AuthUser;
-        setCurrentUser(fullUser);
-        return fullUser;
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+      if (error) throw error;
+      if (data.user) {
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
+        return profile;
       }
-      throw new Error("User data not found in Firestore.");
+      return null;
     } catch (error: any) {
-      toast.error(error.code?.includes('auth/invalid-credential') ? 'Invalid email or password.' : 'An error occurred during login.');
+      toast.error(error.message || 'Failed to sign in.');
       return null;
     } finally {
       setIsLoading(false);
     }
   };
-
- const signup = async (name: string, email: string, pass: string): Promise<AuthUser | null> => {
+  
+  const signup = async (name: string, email: string, pass: string): Promise<AuthUser | null> => {
     setIsLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-      const user = userCredential.user;
-      await updateProfile(user, { displayName: name });
-
-      const newUser: AuthUser = {
-        id: Math.floor(Math.random() * 10000),
-        uid: user.uid,
-        name: name,
-        email: email,
-        role: "Customer",
-      };
-      
-      await setDoc(doc(db, "users", user.uid), newUser);
-      setCurrentUser(newUser);
-      return newUser;
-    } catch (error: any) {
-      // Improved error handling: Show the specific message from Firebase
-      let errorMessage = "Failed to create account.";
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = "An account with this email already exists.";
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = "Password should be at least 6 characters.";
-      } else if (error.message) {
-        errorMessage = error.message;
+      const { data, error } = await supabase.auth.signUp({ 
+        email, 
+        password: pass,
+        options: {
+          data: {
+            name: name,
+          }
+        }
+      });
+      if (error) throw error;
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({ id: data.user.id, name, email, role: 'Customer' });
+        
+        if (profileError) throw profileError;
+        return { id: data.user.id, name, email, role: 'Customer' };
       }
-      toast.error(errorMessage);
+      return null;
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create account.');
       return null;
     } finally {
       setIsLoading(false);
@@ -131,8 +121,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = async () => {
-    await signOut(auth);
-    setCurrentUser(null); 
+    await supabase.auth.signOut();
+    setCurrentUser(null);
     navigate('/login');
   };
 
