@@ -4,21 +4,20 @@ import ProductCard from './ProductCard';
 import ProductDetailModal from './ProductDetailModal';
 import ProductCardSkeleton from './ProductCardSkeleton';
 import toast from 'react-hot-toast';
-import { db } from '../firebase';
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { supabase } from '../supabase';
 import { Product } from '../types';
 
 interface ProductPageLayoutProps {
-  category: string; // We'll keep this for the title
+  category: string;
   subCategories: string[];
 }
 
 const PageTitle = ({ category }: { category: string }) => {
     const titles: { [key: string]: React.ReactNode } = {
-        OTT: <><span className="bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">PREMIUM</span> <span className="block text-white">OTT ACCOUNTS</span></>,
-        IPTV: <><span className="bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">PREMIUM</span> <span className="block text-white">IPTV SERVICES</span></>,
-        Keys: <><span className="bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">SOFTWARE</span><span className="block text-white">LICENSE KEYS</span></>,
-        Downloads: <><span className="bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">DOWNLOAD</span><span className="block text-white">CENTER</span></>
+        'OTT Accounts': <><span className="bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">PREMIUM</span> <span className="block text-white">OTT ACCOUNTS</span></>,
+        'IPTV': <><span className="bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">PREMIUM</span> <span className="block text-white">IPTV SERVICES</span></>,
+        'Product Keys': <><span className="bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">SOFTWARE</span><span className="block text-white">LICENSE KEYS</span></>,
+        'Downloads': <><span className="bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">DOWNLOAD</span><span className="block text-white">CENTER</span></>
     };
     return (<h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-black text-white mb-6 leading-tight">{titles[category] || 'Products'}</h1>);
 };
@@ -33,54 +32,37 @@ const ProductPageLayout: React.FC<ProductPageLayoutProps> = ({ category, subCate
 
   useEffect(() => {
     const loadProducts = async () => {
+      if (!category) return;
+
       try {
         setIsLoading(true);
         setError(null);
         
-        const productsCollectionRef = collection(db, "products");
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('category', category);
         
-        // --- UPDATED QUERY LOGIC ---
-        // We now fetch all products whose category is IN the list of subCategories.
-        // We filter out "All" as it's for client-side filtering, not a real category.
-        const relevantCategories = subCategories.filter(sc => sc !== 'All');
-
-        if (relevantCategories.length === 0) {
-            // If no relevant categories, maybe fetch all products under the main category?
-            // For now, we'll assume this won't happen. If it does, no products will be fetched.
-             setProducts([]);
-             setIsLoading(false);
-             return;
-        }
-
-        const q = query(productsCollectionRef, where("category", "in", relevantCategories));
-        
-        const data = await getDocs(q);
-        const fetchedProducts = data.docs.map(doc => ({
-            ...(doc.data() as Omit<Product, 'docId'>),
-            docId: doc.id
-        }));
-        setProducts(fetchedProducts);
+        if (error) throw error;
+        setProducts(data || []);
 
       } catch (err: any) {
-        // IMPORTANT: Check the browser console for Firestore errors.
-        // It might ask you to create a database index. Click the link in the error message to create it.
         setError(err.message || "Failed to load products.");
-        toast.error("Failed to load products. Check console for details.");
-        console.error(err);
+        toast.error("Failed to load products.");
       } finally {
         setIsLoading(false);
       }
     };
     loadProducts();
-  }, [category, subCategories]); // Depend on subCategories as well
+  }, [category]);
 
   const filteredProducts = activeSubCategory === 'All'
     ? products
-    : products.filter((p) => p.tags && p.tags.includes(activeSubCategory));
+    : products.filter((p) => p.category === activeSubCategory);
 
   const parsePrice = (price: number | string): number => {
     if (typeof price === 'number') return price;
-    return parseFloat(price.replace(/[^0-9.-]+/g,""));
+    return parseFloat(String(price).replace(/[^0-9.-]+/g,""));
   }
 
   const sortedProducts = [...filteredProducts].sort((a, b) => {
@@ -92,10 +74,7 @@ const ProductPageLayout: React.FC<ProductPageLayoutProps> = ({ category, subCate
   });
 
   const closeModal = () => setSelectedProduct(null);
-
-  const handleViewDetails = (product: Product) => {
-    setSelectedProduct(product);
-  };
+  const handleViewDetails = (product: Product) => setSelectedProduct(product);
 
   return (
     <div className="min-h-screen bg-gray-900 pb-16">

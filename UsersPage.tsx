@@ -6,37 +6,35 @@ import PageHeader from '@/components/admin/PageHeader';
 import Modal from '@/components/admin/Modal';
 import { Trash2, Edit, AlertTriangle } from "lucide-react";
 import { motion } from "framer-motion";
-import { db } from '../../firebase';
-import {
-  collection,
-  getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc
-} from "firebase/firestore";
-import { AuthUser } from '../../context/AuthContext';
+import { supabase } from '../../supabase'; // Import Supabase client
+import { AuthUser } from '../../context/AuthContext'; // Import the main user type
 
-// --- TYPE DEFINITIONS ---
-interface User extends Omit<AuthUser, 'id' | 'uid'> {
-    id: string;
+// Use the existing AuthUser type, but add the database 'id' for table keys
+interface User extends AuthUser {
+    id: string; // This is the user's UUID from Supabase auth
 }
 type NewUser = Omit<User, 'id'>;
 
 // --- FORM COMPONENT ---
 interface UserFormProps {
-    onSubmit: (user: NewUser) => void;
+    onSubmit: (user: Partial<NewUser>) => void;
     onCancel: () => void;
-    initialData?: NewUser | null;
+    initialData?: User | null;
 }
 const UserForm: FC<UserFormProps> = ({ onSubmit, onCancel, initialData }) => {
-    const [formData, setFormData] = useState<NewUser>(
-        initialData || { name: '', email: '', role: 'Customer' }
-    );
+    const [formData, setFormData] = useState({
+        name: initialData?.name || '',
+        email: initialData?.email || '',
+        role: initialData?.role || 'Customer'
+    });
     const isEditMode = !!initialData;
 
     useEffect(() => {
-        setFormData(initialData || { name: '', email: '', role: 'Customer' });
+        setFormData({
+            name: initialData?.name || '',
+            email: initialData?.email || '',
+            role: initialData?.role || 'Customer'
+        });
     }, [initialData]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -49,7 +47,6 @@ const UserForm: FC<UserFormProps> = ({ onSubmit, onCancel, initialData }) => {
         onSubmit(formData);
     };
     
-    // --- ADD THIS RETURN STATEMENT WITH THE JSX ---
     return (
         <form onSubmit={handleSubmit} className="space-y-4 text-white">
             <div>
@@ -58,13 +55,12 @@ const UserForm: FC<UserFormProps> = ({ onSubmit, onCancel, initialData }) => {
             </div>
             <div>
                 <label className="block text-sm font-medium text-purple-300 mb-1">Email</label>
-                <input type="email" name="email" value={formData.email} onChange={handleChange} required className="w-full bg-black/30 p-2 rounded-md border border-purple-400 focus:ring-2 focus:ring-cyan-500 focus:outline-none" />
+                <input type="email" name="email" value={formData.email} onChange={handleChange} required disabled={isEditMode} className="w-full bg-black/30 p-2 rounded-md border border-purple-400 focus:ring-2 focus:ring-cyan-500 focus:outline-none disabled:opacity-50" />
             </div>
             <div>
                 <label className="block text-sm font-medium text-purple-300 mb-1">Role</label>
                 <select name="role" value={formData.role} onChange={handleChange} className="w-full bg-black/30 p-2 rounded-md border border-purple-400 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
                     <option value="Customer">Customer</option>
-                    <option value="Moderator">Moderator</option>
                     <option value="Admin">Admin</option>
                 </select>
             </div>
@@ -89,18 +85,15 @@ const UsersPage = () => {
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
-    const usersCollectionRef = collection(db, "users");
-
-    // Fetch users from Firestore
     const getUsers = async () => {
         setIsLoading(true);
         try {
-            const data = await getDocs(usersCollectionRef);
-            const fetchedUsers = data.docs.map(doc => ({ ...doc.data(), id: doc.id })) as User[];
-            setUsers(fetchedUsers);
-        } catch (error) {
+            // Fetch users from the 'profiles' table in Supabase
+            const { data, error } = await supabase.from('profiles').select('*');
+            if (error) throw error;
+            setUsers(data as User[] || []);
+        } catch (error: any) {
             toast.error("Failed to fetch users.");
-            console.error("Error fetching users: ", error);
         } finally {
             setIsLoading(false);
         }
@@ -110,37 +103,33 @@ const UsersPage = () => {
         getUsers();
     }, []);
 
-    // --- CRUD Handlers for Firestore ---
-    const handleFormSubmit = async (userData: NewUser) => {
-        if (editingUser) {
-            // UPDATE logic
-            const userDoc = doc(db, "users", editingUser.id);
-            await updateDoc(userDoc, userData);
-            toast.success("User updated successfully!");
-        } else {
-            // CREATE logic
-            // Note: This adds a user to the database but not to Firebase Auth.
-            // A real-world app would use a backend function to do both.
-            await addDoc(usersCollectionRef, userData);
-            toast.success("User added to database successfully!");
+    const handleFormSubmit = async (userData: Partial<NewUser>) => {
+        const toastId = toast.loading(editingUser ? 'Updating user...' : 'Adding user...');
+        try {
+            if (editingUser) {
+                // Update user role in the 'profiles' table
+                const { error } = await supabase.from('profiles').update({ role: userData.role, name: userData.name }).eq('id', editingUser.id);
+                if (error) throw error;
+                toast.success("User updated successfully!", { id: toastId });
+            } else {
+                // Note: Creating a user from the admin panel is complex.
+                // It requires using Supabase Admin privileges on a secure server, not the client.
+                // For this example, we will show an informative toast.
+                toast.error("User creation must be done via the Signup page.", { id: toastId });
+            }
+            closeFormModal();
+            getUsers();
+        } catch (error) {
+            toast.error("An error occurred.", { id: toastId });
         }
-        closeFormModal();
-        getUsers(); // Refresh list
     };
 
     const handleDeleteConfirm = async () => {
-        if (deletingUserId) {
-            // DELETE logic
-            // Note: This deletes the Firestore record but not the Firebase Auth user.
-            const userDoc = doc(db, "users", deletingUserId);
-            await deleteDoc(userDoc);
-            toast.success("User deleted from database successfully!");
-            closeDeleteModal();
-            getUsers(); // Refresh list
-        }
+        // Deleting users should be done from a secure backend for safety.
+        toast.error("User deletion from the admin panel is disabled for this example.");
+        closeDeleteModal();
     };
 
-    // --- Modal Control & Filtering ---
     const openFormModal = (user: User | null = null) => { setEditingUser(user); setIsFormModalOpen(true); };
     const closeFormModal = () => { setEditingUser(null); setIsFormModalOpen(false); };
     const openDeleteModal = (id: string) => { setDeletingUserId(id); setIsDeleteModalOpen(true); };
@@ -173,12 +162,12 @@ const UsersPage = () => {
                 <UserForm onSubmit={handleFormSubmit} onCancel={closeFormModal} initialData={editingUser} />
             </Modal>
             <Modal isOpen={isDeleteModalOpen} onClose={closeDeleteModal} title="Confirm Deletion">
-                <div className="text-white">
+                <div className="text-white text-center p-4">
                     <AlertTriangle className="text-red-500 w-12 h-12 mx-auto mb-4" />
-                    <p className="text-center">Are you sure you want to delete this user's database record? This does not remove their login access.</p>
+                    <p>Are you sure you want to delete this user's database record? (This action is disabled in this example)</p>
                     <div className="flex justify-center gap-4 pt-6">
                         <button onClick={closeDeleteModal} className="px-6 py-2 rounded-md bg-black/20 text-gray-300 hover:bg-black/40">Cancel</button>
-                        <button onClick={handleDeleteConfirm} className="px-8 py-2 rounded-md font-semibold text-white bg-red-600 hover:bg-red-700">Delete</button>
+                        <button onClick={handleDeleteConfirm} className="px-8 py-2 rounded-md font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50" disabled>Delete</button>
                     </div>
                 </div>
             </Modal>

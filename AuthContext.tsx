@@ -2,12 +2,10 @@ import React, { createContext, useState, useContext, ReactNode, useEffect } from
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { supabase } from '../supabase';
-// Import the necessary types from the Supabase library
-import { Session, User, AuthChangeEvent } from '@supabase/supabase-js';
+import { Session, AuthChangeEvent } from '@supabase/supabase-js';
 
-// --- TYPE DEFINITIONS ---
 export interface AuthUser {
-  id: string; // Supabase uses UUID strings for IDs
+  id: string;
   name: string;
   email: string;
   role: 'Admin' | 'Customer' | 'Moderator';
@@ -24,52 +22,37 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Listen for authentication changes from Supabase
+    // This listener correctly fetches the full user profile from the database
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      // FIX: Add the correct type for the '_event' parameter
       async (_event: AuthChangeEvent, session: Session | null) => {
         if (session?.user) {
-          // User is logged in, fetch their profile from our 'profiles' table
           const { data: profile, error } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', session.user.id)
             .single();
-
+          
           if (error) {
-            console.error("Error fetching profile:", error);
+            console.error("Error fetching profile: ", error);
+            await supabase.auth.signOut(); // Log out if profile is inaccessible
             setCurrentUser(null);
           } else if (profile) {
-            setCurrentUser({
-              id: profile.id,
-              name: profile.name,
-              email: profile.email,
-              role: profile.role,
-            });
+            setCurrentUser(profile as AuthUser);
           }
         } else {
-          // User is logged out
           setCurrentUser(null);
         }
         setAuthLoading(false);
       }
     );
-
-    // Cleanup subscription on unmount
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = async (email: string, pass: string): Promise<AuthUser | null> => {
@@ -79,7 +62,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (error) throw error;
       if (data.user) {
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
-        return profile;
+        return profile as AuthUser | null;
       }
       return null;
     } catch (error: any) {
@@ -96,20 +79,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const { data, error } = await supabase.auth.signUp({ 
         email, 
         password: pass,
-        options: {
-          data: {
-            name: name,
-          }
-        }
+        options: { data: { name: name } }
       });
       if (error) throw error;
       if (data.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({ id: data.user.id, name, email, role: 'Customer' });
-        
+        const newUserProfile = { id: data.user.id, name, email, role: 'Customer' as const };
+        const { error: profileError } = await supabase.from('profiles').insert(newUserProfile);
         if (profileError) throw profileError;
-        return { id: data.user.id, name, email, role: 'Customer' };
+        return newUserProfile;
       }
       return null;
     } catch (error: any) {
@@ -122,7 +99,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     await supabase.auth.signOut();
-    setCurrentUser(null);
     navigate('/login');
   };
 
