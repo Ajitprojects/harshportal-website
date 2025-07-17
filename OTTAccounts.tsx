@@ -1,21 +1,53 @@
-// src/pages/OTTAccounts.tsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import ProductPageLayout from '../components/ProductPageLayout';
+import toast from 'react-hot-toast';
+import { db } from '../firebase';
+import { collection, getDocs, query, where } from "firebase/firestore";
+
+// Define the shape of your Product data
+interface Product {
+  id: string; 
+  name: string;
+  price: string;
+  stock: number;
+  category: string;
+}
 
 const OTTAccounts = () => {
-  const title = (
-    <h1 className="text-6xl md:text-8xl font-black text-white mb-6 leading-tight">
-      <span className="bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">PREMIUM</span>
-      <span className="block text-white">OTT ACCOUNTS</span>
-    </h1>
-  );
-  const subCategories = ['All', 'Streaming', 'Music', 'Sports'];
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
- return (
-    <ProductPageLayout 
+  useEffect(() => {
+    const getProducts = async () => {
+      setIsLoading(true);
+      try {
+        // Reference to your 'products' collection in Firestore
+        const productsCollectionRef = collection(db, "products");
+        
+        // Create a query to get products where the category is relevant
+        const q = query(productsCollectionRef, where("category", "in", ["OTT Accounts", "Streaming", "Music", "Sports"]));
+        
+        const data = await getDocs(q);
+        const fetchedProducts = data.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Product[];
+        
+        setProducts(fetchedProducts);
+      } catch (error) {
+        toast.error("Failed to fetch products.");
+        console.error("Error fetching products: ", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    getProducts();
+  }, []);
+
+  return (
+     <ProductPageLayout 
       category="OTT"
       subCategories={['All', 'Streaming', 'Music', 'Sports']}
     />
   );
 };
+
 export default OTTAccounts;

@@ -6,10 +6,7 @@ const LiveClock = () => {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
-    // This timer will update the time every second
     const timerId = setInterval(() => setTime(new Date()), 1000);
-    
-    // Cleanup the timer when the component is unmounted
     return () => clearInterval(timerId);
   }, []);
 

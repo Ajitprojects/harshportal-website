@@ -40,9 +40,9 @@ const Testimonials = () => {
           className="text-center mb-16"
         >
           <h2 className="text-4xl md:text-5xl font-display font-bold text-white mb-4">
-            What Our
+            What Our{" "}
             <span className="bg-gradient-to-r from-accent-400 to-primary-400 bg-clip-text text-transparent">
-              {" "}Customers Say
+              Customers Say
             </span>
           </h2>
           <p className="text-white/70 text-lg max-w-2xl mx-auto">
@@ -50,6 +50,7 @@ const Testimonials = () => {
           </p>
         </motion.div>
 
+        {/* Testimonial Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {testimonials.map((testimonial, index) => (
             <motion.div
@@ -67,7 +68,7 @@ const Testimonials = () => {
               </div>
 
               <Quote className="w-8 h-8 text-accent-400 mb-4" />
-              
+
               <p className="text-white/80 text-sm leading-relaxed mb-6">
                 "{testimonial.text}"
               </p>
@@ -94,30 +95,32 @@ const Testimonials = () => {
           ))}
         </div>
 
+        {/* Summary Stats - Responsive Fix */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           className="text-center mt-12"
         >
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10 inline-block">
-            <div className="flex items-center justify-center space-x-8">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-white">4.9/5</div>
-                <div className="text-white/60 text-sm">Average Rating</div>
-              </div>
-              <div className="w-px h-12 bg-white/20"></div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-white">2,500+</div>
-                <div className="text-white/60 text-sm">Reviews</div>
-              </div>
-              <div className="w-px h-12 bg-white/20"></div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-white">98%</div>
-                <div className="text-white/60 text-sm">Satisfaction</div>
-              </div>
-            </div>
-          </div>
+        <div className="bg-white/5 backdrop-blur-sm rounded-xl px-3 py-4 sm:px-6 sm:py-6 border border-white/10 inline-block overflow-x-auto">
+  <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 min-w-[280px]">
+    <div className="text-center">
+      <div className="text-xl sm:text-2xl font-bold text-white">4.9/5</div>
+      <div className="text-white/60 text-xs sm:text-sm leading-tight">Average Rating</div>
+    </div>
+    <div className="hidden sm:block w-px h-10 bg-white/20"></div>
+    <div className="text-center">
+      <div className="text-xl sm:text-2xl font-bold text-white">2,500+</div>
+      <div className="text-white/60 text-xs sm:text-sm leading-tight">Reviews</div>
+    </div>
+    <div className="hidden sm:block w-px h-10 bg-white/20"></div>
+    <div className="text-center">
+      <div className="text-xl sm:text-2xl font-bold text-white">98%</div>
+      <div className="text-white/60 text-xs sm:text-sm leading-tight">Satisfaction</div>
+    </div>
+  </div>
+</div>
+
         </motion.div>
       </div>
     </section>

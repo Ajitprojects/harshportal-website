@@ -1,13 +1,12 @@
-// src/pages/SignupPage.tsx (Redesigned)
-
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { UserPlus, User, Lock, Mail, Github, Gitlab } from 'lucide-react';
+import { User, Lock, Mail, Github, Gitlab } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import toast from 'react-hot-toast';
 
 const signupSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
@@ -18,25 +17,25 @@ const signupSchema = z.object({
 type SignupFormValues = z.infer<typeof signupSchema>;
 
 const SignupPage = () => {
-  const [serverError, setServerError] = useState('');
-  const { signup } = useAuth();
+  const { signup, isLoading } = useAuth();
   const navigate = useNavigate();
 
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting }
+    formState: { errors }
   } = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema)
   });
 
-  const onSubmit = (data: SignupFormValues) => {
-    setServerError('');
-    const isSignedUp = signup(data.name, data.email, data.password);
-    if (isSignedUp) {
-      navigate('/');
-    } else {
-      setServerError('Could not create account. Please try again.');
+  const onSubmit = async (data: SignupFormValues) => {
+    const newUser = await signup(data.name, data.email, data.password);
+    
+    // The logic is now much simpler. If signup is successful, we navigate.
+    // If it fails, the context shows the error and we do nothing here.
+    if (newUser) {
+      toast.success(`Account created successfully, ${newUser.name}!`);
+      navigate('/profile'); // Navigate to profile after signup
     }
   };
 
@@ -61,14 +60,14 @@ const SignupPage = () => {
         </div>
         
         <div className="flex justify-center gap-4">
-            <button className="w-full flex items-center justify-center gap-2 bg-gray-700/50 p-3 rounded-lg border border-gray-600 hover:bg-gray-700 transition-colors"><Gitlab size={20}/> GitLab</button>
-            <button className="w-full flex items-center justify-center gap-2 bg-gray-700/50 p-3 rounded-lg border border-gray-600 hover:bg-gray-700 transition-colors"><Github size={20}/> GitHub</button>
+          <button className="w-full flex items-center justify-center gap-2 bg-gray-700/50 p-3 rounded-lg border border-gray-600 hover:bg-gray-700 transition-colors"><Gitlab size={20}/> GitLab</button>
+          <button className="w-full flex items-center justify-center gap-2 bg-gray-700/50 p-3 rounded-lg border border-gray-600 hover:bg-gray-700 transition-colors"><Github size={20}/> GitHub</button>
         </div>
         
         <div className="flex items-center text-xs text-gray-500 uppercase">
-            <hr className="flex-1 border-gray-700"/>
-            <span className="px-4">OR</span>
-            <hr className="flex-1 border-gray-700"/>
+          <hr className="flex-1 border-gray-700"/>
+          <span className="px-4">OR</span>
+          <hr className="flex-1 border-gray-700"/>
         </div>
 
         <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
@@ -96,11 +95,9 @@ const SignupPage = () => {
             {errors.password && <p className={errorTextClass}>{errors.password.message}</p>}
           </div>
 
-          {serverError && <p className="text-sm text-red-500 text-center">{serverError}</p>}
-
           <div>
-            <motion.button type="submit" disabled={isSubmitting} whileHover={{ scale: 1.02, y: -2, boxShadow: "0 0 20px rgba(0, 255, 255, 0.3)" }} whileTap={{ scale: 0.98 }} className="w-full flex justify-center py-3 px-4 text-sm font-bold rounded-lg text-white bg-gradient-to-r from-cyan-500 to-purple-600 disabled:opacity-50">
-                {isSubmitting ? 'Creating Account...' : 'Create Account'}
+            <motion.button type="submit" disabled={isLoading} whileHover={{ scale: 1.02, y: -2, boxShadow: "0 0 20px rgba(0, 255, 255, 0.3)" }} whileTap={{ scale: 0.98 }} className="w-full flex justify-center py-3 px-4 text-sm font-bold rounded-lg text-white bg-gradient-to-r from-cyan-500 to-purple-600 disabled:opacity-50">
+                {isLoading ? 'Creating Account...' : 'Create Account'}
             </motion.button>
           </div>
         </form>

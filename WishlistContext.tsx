@@ -1,17 +1,18 @@
-// src/context/WishlistContext.tsx (Updated with localStorage)
+// src/context/WishlistContext.tsx
 
 import React, { createContext, useState, useContext, ReactNode } from 'react';
+import toast from 'react-hot-toast'; // ✅ Required for toast
 
 interface WishlistContextType {
   wishlistItemIds: Set<number>;
   toggleWishlist: (id: number) => void;
   isItemInWishlist: (id: number) => boolean;
+  clearWishlist: () => void; // ✅ Add to context type
 }
 
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
 
 export const WishlistProvider = ({ children }: { children: ReactNode }) => {
-  // 1. Initialize wishlist state from localStorage
   const [wishlistItemIds, setWishlistItemIds] = useState<Set<number>>(() => {
     try {
       const storedWishlist = localStorage.getItem('wishlist');
@@ -22,7 +23,6 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
     }
   });
 
-  // Helper function to update both state and localStorage
   const updateWishlist = (newWishlist: Set<number>) => {
     setWishlistItemIds(newWishlist);
     localStorage.setItem('wishlist', JSON.stringify(Array.from(newWishlist)));
@@ -42,7 +42,19 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
     return wishlistItemIds.has(id);
   };
 
-  const value = { wishlistItemIds, toggleWishlist, isItemInWishlist };
+  // ✅ New function to clear all wishlist items
+  const clearWishlist = () => {
+    updateWishlist(new Set());
+    toast('Wishlist cleared.', { icon: '🗑️' });
+  };
+
+  // ✅ Add clearWishlist to value
+  const value = {
+    wishlistItemIds,
+    toggleWishlist,
+    isItemInWishlist,
+    clearWishlist,
+  };
 
   return (
     <WishlistContext.Provider value={value}>

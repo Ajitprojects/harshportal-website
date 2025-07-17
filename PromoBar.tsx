@@ -20,19 +20,26 @@ const PromoBar = () => {
       <div className="max-w-[1400px] mx-auto px-8 relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center text-center">
           {/* SALE TEXT */}
-          <div className="flex items-center justify-center space-x-3">
-            <Flame className="w-5 h-5 text-red-500 animate-pulse" />
-            <span className="font-cyber font-bold text-sm text-white uppercase">Mega Sale: <span className="text-yellow-400">90% OFF</span></span>
-          </div>
+        <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-2">
+  <Flame className="w-4 h-4 text-red-500 animate-pulse" />
+  <span className="font-cyber font-bold uppercase">
+    Mega Sale: <span className="text-yellow-400">90% OFF</span>
+  </span>
+</div>
 
-          {/* OFFER CODE */}
-          <div className="hidden md:flex items-center justify-center space-x-3">
-            <Gift className="w-5 h-5 text-green-400" />
-            <span className="font-cyber font-bold text-sm text-white uppercase">Use Code:</span>
-            <div className="bg-black/50 rounded-md px-3 py-1 border border-green-500/50">
-              <span className="font-cyber font-black text-sm text-green-400">CYBER2024</span>
-            </div>
-          </div>
+{/* OFFER CODE */}
+<div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
+  <Gift className="w-4 h-4 sm:w-5 sm:h-5 text-green-400 animate-glow" />
+  <span className="font-cyber font-bold text-xs sm:text-sm text-white uppercase">
+    Use Code:
+  </span>
+  <div className="bg-black/50 rounded-md px-2 py-[2px] sm:px-3 sm:py-1 border border-green-500/50">
+    <span className="font-cyber font-black text-xs sm:text-sm text-green-400 tracking-wide">
+      CYBER2024
+    </span>
+  </div>
+</div>
+
 
           {/* TIME */}
           <div className="hidden md:flex items-center justify-center space-x-3">
