@@ -2,75 +2,92 @@
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
 
-
-/* Google Fonts Import - Yeh zaroori hai */
+/* Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
 
-/* Basic setup */
+/* ========== Base Reset ========== */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  cursor: none; /* Hide default cursor */
 }
 
 html, body {
   overflow-x: hidden;
-}
-
-html {
   scroll-behavior: smooth;
-}
-
-/* Add this to hide the default cursor */
-* {
-  cursor: none;
-}
-
-body {
-  font-family: 'Rajdhani', system-ui, -apple-system, sans-serif; /* Default font */
-  line-height: 1.6;
+  font-family: 'Rajdhani', system-ui, -apple-system, sans-serif;
+  background-color: #0a0a0f;
   color: #ffffff;
-  background: #0a0a0f; /* Base background color */
+  line-height: 1.6;
   min-height: 100vh;
-  overflow-x: hidden;
 }
 
-/* Cyberpunk Scrollbar - Yeh custom CSS mein hi rahega kyunki Tailwind ise directly handle nahi karta */
+/* ========== Reusable Input Class ========== */
+.input {
+  @apply w-full bg-black/30 text-white px-4 py-2 rounded-md border border-cyan-500 placeholder:text-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-500 transition;
+}
+
+.input {
+  @apply w-full bg-black/40 text-cyan-300 px-4 py-2 rounded-md border border-cyan-500 placeholder:text-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-400 transition;
+}
+
+@layer components {
+  .input {
+    @apply w-full bg-black/30 text-white px-4 py-2 rounded-md border border-cyan-500 placeholder:text-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-500 transition;
+  }
+}
+
+/* ========== Scrollbar Cyberpunk ========== */
 ::-webkit-scrollbar {
   width: 12px;
 }
-
 ::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.8);
   border: 1px solid rgba(0, 255, 255, 0.2);
 }
-
 ::-webkit-scrollbar-thumb {
   background: linear-gradient(to bottom, #00ffff, #ff00ff);
   border-radius: 6px;
   border: 1px solid rgba(0, 255, 255, 0.3);
 }
-
 ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(to bottom, #00ff7f, #ffff00);
 }
 
-/* Text Selection styles */
+/* ========== Selection Highlight ========== */
 ::selection {
   background: rgba(0, 255, 255, 0.3);
   color: white;
 }
 
-/* Custom Focus styles */
+/* ========== Focus Ring ========== */
 button:focus-visible,
 input:focus-visible,
-a:focus-visible {
+a:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
   outline: 2px solid #00ffff;
   outline-offset: 2px;
   box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
 }
 
-/* Reduced Motion for Accessibility */
+/* ========== Animation: Glow Effect for Tabs ========== */
+@keyframes glowTab {
+  0%, 100% {
+    box-shadow: 0 0 6px rgba(6, 182, 212, 0.5), 0 0 12px rgba(6, 182, 212, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(6, 182, 212, 0.9), 0 0 24px rgba(6, 182, 212, 0.5);
+  }
+}
+
+.animate-glow-tab {
+  animation: glowTab 2.5s ease-in-out infinite;
+  border: 1px solid rgba(6, 182, 212, 0.4);
+}
+
+/* ========== Motion Accessibility ========== */
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
@@ -80,16 +97,6 @@ a:focus-visible {
   }
 }
 
-@keyframes glowTab {
-  0%, 100% {
-    box-shadow: 0 0 6px rgba(6, 182, 212, 0.5), 0 0 12px rgba(6, 182, 212, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 12px rgba(6, 182, 212, 0.9), 0 0 24px rgba(6, 182, 212, 0.5);
-  }
+.input {
+  @apply w-full px-4 py-2 bg-black/30 border border-cyan-500 rounded text-white focus:outline-none focus:ring-2 focus:ring-purple-500;
 }
-.animate-glow-tab {
-  animation: glowTab 2.5s ease-in-out infinite;
-  border: 1px solid rgba(6, 182, 212, 0.4);
-}
-

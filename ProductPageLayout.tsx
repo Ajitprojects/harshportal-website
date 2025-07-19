@@ -37,12 +37,13 @@ const ProductPageLayout: React.FC<ProductPageLayoutProps> = ({ category, subCate
       try {
         setIsLoading(true);
         setError(null);
-        
+
+        await new Promise(res => setTimeout(res, 800)); // Simulate delay
         const { data, error } = await supabase
           .from('products')
           .select('*')
           .eq('category', category);
-        
+
         if (error) throw error;
         setProducts(data || []);
 
@@ -96,11 +97,14 @@ const ProductPageLayout: React.FC<ProductPageLayoutProps> = ({ category, subCate
               </motion.button>
             ))}
           </div>
-          <select
-            value={sortOption}
-            onChange={(e) => setSortOption(e.target.value)}
-            className="bg-gray-800 border border-gray-600 text-white text-sm rounded-md px-3 py-2 self-center lg:self-auto"
-          >
+      <select
+  id="sort-products"
+  name="sort"
+  value={sortOption}
+  onChange={(e) => setSortOption(e.target.value)}
+  className="bg-gray-800 border border-gray-600 text-white text-sm rounded-md px-3 py-2 self-center lg:self-auto"
+>
+
             <option value="default">Sort By</option>
             <option value="priceLow">Price: Low to High</option>
             <option value="priceHigh">Price: High to Low</option>
@@ -130,5 +134,6 @@ const ProductPageLayout: React.FC<ProductPageLayoutProps> = ({ category, subCate
     </div>
   );
 };
+
 
 export default ProductPageLayout;

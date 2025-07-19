@@ -7,6 +7,9 @@ export default {
   ],
   theme: {
   	extend: {
+		 colors: {
+      input: '#1a1a2e',
+    },
   		backgroundImage: {
   			'cyber-grid': 'linear-gradient(rgba(0, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px)'
   		},
@@ -99,6 +102,8 @@ export default {
   			]
   		},
   		animation: {
+			  spin: "spin 1s linear infinite",
+  "spin-slow": "spin 3s linear infinite",
   			float: 'cyberFloat 6s ease-in-out infinite',
   			glow: 'cyberPulse 2s ease-in-out infinite',
 			 'typewriter-loop': 'typeLoop 4s steps(13) infinite, blink 1s step-end infinite',

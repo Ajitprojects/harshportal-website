@@ -1,9 +1,10 @@
+// src/pages/admin/ProductsPage.tsx
 import React, { useState, useEffect, useMemo, FC, FormEvent } from 'react';
 import toast from 'react-hot-toast';
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import AdminTable from "@/components/admin/AdminTable";
 import PageHeader from '@/components/admin/PageHeader';
 import Modal from '@/components/admin/Modal';
+import AdminTable, { Column } from '@/components/admin/AdminTable';
 import { Trash2, Edit, AlertTriangle, PlusCircle, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from '../../supabase';
@@ -11,274 +12,254 @@ import { Product } from '../../types';
 
 type NewProductData = Omit<Product, 'id' | 'docId'>;
 
-// --- FORM COMPONENT ---
-interface ProductFormProps {
-    onSubmit: (product: Partial<NewProductData>) => void;
-    onCancel: () => void;
-    initialData?: Product | null;
-    existingCategories: string[];
-}
+const ProductForm: FC<{
+  onSubmit: (product: Partial<NewProductData>) => void;
+  onCancel: () => void;
+  initialData?: Product | null;
+}> = ({ onSubmit, onCancel, initialData }) => {
+  const [formData, setFormData] = useState({
+    name: '', price: 0, originalPrice: 0, stock: 0, category: '',
+    tags: '', gradient: '', image: '', description: '',
+    features: [{ title: '', desc: '' }]
+  });
+  const [categories, setCategories] = useState<string[]>([]);
 
-const ProductForm: FC<ProductFormProps> = ({ onSubmit, onCancel, initialData, existingCategories }) => {
-    const [formData, setFormData] = useState({
-        name: '', price: 0, originalPrice: 0, stock: 0, category: '',
-        tags: '', gradient: '', image: '', description: '',
-        features: [{ title: '', desc: '' }]
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        name: initialData.name || '',
+        price: initialData.price || 0,
+        originalPrice: initialData.originalPrice ?? 0,
+        stock: initialData.stock || 0,
+        category: initialData.category || '',
+        tags: (initialData.tags || []).join(', '),
+        gradient: (initialData.gradient || []).join(', '),
+        features: initialData.features?.length ? initialData.features : [{ title: '', desc: '' }],
+        image: initialData.image || '',
+        description: initialData.description || '',
+      });
+    }
+  }, [initialData]);
+
+  useEffect(() => {
+    supabase.from('categories').select('name').then(({ data, error }) => {
+      if (!error && data) {
+        setCategories(data.map((c: any) => c.name).filter(Boolean));
+      }
     });
-    const [newCategory, setNewCategory] = useState('');
-    const isEditMode = !!initialData;
+  }, []);
 
-    useEffect(() => {
-        if (initialData) {
-            setFormData({
-                name: initialData.name || '',
-                price: initialData.price || 0,
-                originalPrice: initialData.originalPrice || 0,
-                stock: initialData.stock || 0,
-                category: initialData.category || '',
-                tags: initialData.tags?.join(', ') || '',
-                gradient: initialData.gradient?.join(', ') || '',
-                features: initialData.features?.length ? initialData.features : [{ title: '', desc: '' }],
-                image: initialData.image || '',
-                description: initialData.description || '',
-            });
-        } else {
-            setFormData({
-                name: '', price: 0, originalPrice: 0, stock: 0, category: '',
-                tags: '', gradient: '', image: '', description: '',
-                features: [{ title: '', desc: '' }]
-            });
-        }
-        setNewCategory('');
-    }, [initialData]);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    setFormData(prev => ({ ...prev, [name]: type === 'number' ? parseFloat(value) || 0 : value }));
+  };
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleFeatureChange = (index: number, field: 'title' | 'desc', value: string) => {
+    const updated = [...formData.features];
+    updated[index][field] = value;
+    setFormData(prev => ({ ...prev, features: updated }));
+  };
+
+  const addFeature = () => setFormData(prev => ({ ...prev, features: [...prev.features, { title: '', desc: '' }] }));
+  const removeFeature = (index: number) => setFormData(prev => ({ ...prev, features: formData.features.filter((_, i) => i !== index) }));
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.category) return toast.error("Name and Category are required");
+
+    const finalData: Partial<NewProductData> = {
+      name: formData.name,
+      price: Number(formData.price) || 0,
+      originalPrice: formData.originalPrice ? Number(formData.originalPrice) : undefined,
+      stock: Number(formData.stock) || 0,
+      category: formData.category,
+      tags: formData.tags.split(',').map(tag => tag.trim()).filter(Boolean),
+      gradient: formData.gradient.split(',').map(g => g.trim()).filter(Boolean),
+      features: formData.features.filter(f => f.title.trim() || f.desc.trim()),
+      image: formData.image,
+      description: formData.description
     };
 
-    const handleFeatureChange = (index: number, field: 'title' | 'desc', value: string) => {
-        const updatedFeatures = [...formData.features];
-        updatedFeatures[index][field] = value;
-        setFormData(prev => ({ ...prev, features: updatedFeatures }));
-    };
+    onSubmit(finalData);
+  };
 
-    const addFeature = () => setFormData(prev => ({ ...prev, features: [...prev.features, { title: '', desc: '' }] }));
-    const removeFeature = (index: number) => setFormData(prev => ({ ...prev, features: formData.features.filter((_, i) => i !== index) }));
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6 text-white max-h-[75vh] overflow-y-auto p-1 pr-2">
+      <div className="space-y-2">
+        <label className="block text-sm font-semibold">Product Name</label>
+        <input name="name" value={formData.name} onChange={handleChange} required className="input" />
 
-    const handleSubmit = (e: FormEvent) => {
-        e.preventDefault();
-        const finalCategory = formData.category === 'add_new' ? newCategory : formData.category;
-        if (!finalCategory) {
-            toast.error("Please select or add a category.");
-            return;
-        }
+        <label className="block text-sm font-semibold">Price</label>
+        <input name="price" type="number" value={formData.price} onChange={handleChange} className="input" />
 
-        const finalData = {
-            name: formData.name,
-            price: Number(formData.price) || 0,
-            originalPrice: Number(formData.originalPrice) || undefined,
-            stock: Number(formData.stock) || 0,
-            category: finalCategory,
-            tags: formData.tags.split(',').map(tag => tag.trim()).filter(Boolean),
-            gradient: formData.gradient.split(',').map(g => g.trim()).filter(Boolean),
-            features: formData.features.filter(f => f.title && f.desc),
-            image: formData.image,
-            description: formData.description,
-        };
-        onSubmit(finalData);
-    };
+        <label className="block text-sm font-semibold">Original Price</label>
+        <input name="originalPrice" type="number" value={formData.originalPrice} onChange={handleChange} className="input" />
 
-    return (
-        <form onSubmit={handleSubmit} className="space-y-4 text-white max-h-[70vh] overflow-y-auto p-1 pr-4">
-            <div>
-                <label className="block text-sm font-medium text-purple-300 mb-1">Product Name</label>
-                <input name="name" value={formData.name} onChange={handleChange} required className="w-full bg-black/30 p-2 rounded-md border border-purple-400" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-sm font-medium text-purple-300 mb-1">Price</label>
-                    <input name="price" type="number" step="0.01" value={formData.price} onChange={handleChange} required className="w-full bg-black/30 p-2 rounded-md border border-purple-400" />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-purple-300 mb-1">Original Price (Optional)</label>
-                    <input name="originalPrice" type="number" step="0.01" value={formData.originalPrice} onChange={handleChange} className="w-full bg-black/30 p-2 rounded-md border border-purple-400" />
-                </div>
-            </div>
-             <div>
-                <label className="block text-sm font-medium text-purple-300 mb-1">Stock</label>
-                <input name="stock" type="number" value={formData.stock} onChange={handleChange} className="w-full bg-black/30 p-2 rounded-md border border-purple-400" />
-            </div>
-            <div>
-                <label className="block text-sm font-medium text-purple-300 mb-1">Category</label>
-                <select name="category" value={formData.category} onChange={handleChange} required className="w-full bg-black/30 p-2 rounded-md border border-purple-400">
-                    <option value="">Select an existing category</option>
-                    {existingCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                    <option value="add_new" className="font-bold text-cyan-400">-- Add New Category --</option>
-                </select>
-                {formData.category === 'add_new' && (
-                  <input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="Type new category name..." className="w-full bg-black/30 p-2 mt-2 rounded-md border border-cyan-500/50" />
-                )}
-            </div>
-            <div>
-                <label className="block text-sm font-medium text-purple-300 mb-1">Image URL</label>
-                <input name="image" value={formData.image} onChange={handleChange} placeholder="https://..." className="w-full bg-black/30 p-2 rounded-md border border-purple-400" />
-            </div>
-            <div>
-                <label className="block text-sm font-medium text-purple-300 mb-1">Description</label>
-                <textarea name="description" value={formData.description} onChange={handleChange} rows={3} className="w-full bg-black/30 p-2 rounded-md border border-purple-400" />
-            </div>
-            <div>
-                <label className="block text-sm font-medium text-purple-300 mb-2">Key Features</label>
-                <div className="space-y-3">
-                    {formData.features.map((feature, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                            <input value={feature.title} onChange={(e) => handleFeatureChange(index, 'title', e.target.value)} placeholder="Feature Title" className="w-1/3 bg-black/30 p-2 rounded-md border border-purple-400/50 text-sm"/>
-                            <input value={feature.desc} onChange={(e) => handleFeatureChange(index, 'desc', e.target.value)} placeholder="Feature Description" className="flex-1 bg-black/30 p-2 rounded-md border border-purple-400/50 text-sm"/>
-                            <button type="button" onClick={() => removeFeature(index)} className="text-red-500 hover:text-red-400"><XCircle size={20} /></button>
-                        </div>
-                    ))}
-                </div>
-                 <button type="button" onClick={addFeature} className="mt-3 flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-200"><PlusCircle size={18} /> Add Feature</button>
-            </div>
-            <div className="flex justify-end gap-4 pt-6">
-                <button type="button" onClick={onCancel} className="px-4 py-2 rounded-md bg-black/20 text-gray-300 hover:bg-black/40">Cancel</button>
-                <button type="submit" className="px-6 py-2 rounded-md font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90">
-                    {isEditMode ? 'Save Changes' : 'Add Product'}
-                </button>
-            </div>
-        </form>
-    );
+        <label className="block text-sm font-semibold">Stock</label>
+        <input name="stock" type="number" value={formData.stock} onChange={handleChange} className="input" />
+
+        <label className="block text-sm font-semibold">Category</label>
+        <select name="category" value={formData.category} onChange={handleChange} className="input">
+          <option value="">Select Category</option>
+          {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <label className="block text-sm font-semibold">Tags (comma-separated)</label>
+        <input name="tags" value={formData.tags} onChange={handleChange} className="input" />
+
+        <label className="block text-sm font-semibold">Gradient Colors (comma-separated)</label>
+        <input name="gradient" value={formData.gradient} onChange={handleChange} className="input" />
+
+        <label className="block text-sm font-semibold">Image URL</label>
+        <input name="image" value={formData.image} onChange={handleChange} className="input" />
+
+        <label className="block text-sm font-semibold">Description</label>
+        <textarea name="description" value={formData.description} onChange={handleChange} className="input" />
+      </div>
+
+      <div className="space-y-2">
+        <label className="block text-sm font-bold">Product Features</label>
+        {formData.features.map((f, i) => (
+          <div key={i} className="flex gap-2">
+            <input value={f.title} onChange={e => handleFeatureChange(i, 'title', e.target.value)} placeholder="Title" className="input" />
+            <input value={f.desc} onChange={e => handleFeatureChange(i, 'desc', e.target.value)} placeholder="Description" className="input flex-1" />
+            <button onClick={() => removeFeature(i)} type="button" className="text-red-400"><XCircle size={18} /></button>
+          </div>
+        ))}
+        <button type="button" onClick={addFeature} className="text-cyan-400 flex items-center gap-1 text-sm">
+          <PlusCircle size={18} /> Add Feature
+        </button>
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onCancel} className="bg-gray-700 px-4 py-2 rounded">Cancel</button>
+        <button type="submit" className="bg-purple-600 px-6 py-2 rounded">Save</button>
+      </div>
+    </form>
+  );
 };
 
-// --- MAIN PAGE COMPONENT ---
-const ProductsPage = () => {
+const ProductsPage: FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [deletingProductId, setDeletingProductId] = useState<number | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  const uniqueCategories = useMemo(() => {
-    const categories = products.map(p => p.category).filter(Boolean);
-    return [...new Set(categories)];
-  }, [products]);
+  const categories = useMemo(() => [...new Set(products.map(p => p.category).filter(Boolean))], [products]);
 
   const getProducts = async () => {
     setIsLoading(true);
+    const { data, error } = await supabase.from('products').select('*');
+    if (!error && data) setProducts(data);
+    else toast.error("Failed to load products");
+    setIsLoading(false);
+  };
+
+  useEffect(() => { getProducts(); }, []);
+
+  const handleSubmit = async (values: Partial<NewProductData>) => {
+    const isEdit = !!editingProduct;
+    const toastId = toast.loading(isEdit ? 'Updating...' : 'Adding...');
     try {
-      const { data, error } = await supabase.from('products').select('*').order('id', { ascending: true });
+      const query = isEdit
+        ? supabase.from('products').update(values).eq('id', editingProduct!.id)
+        : supabase.from('products').insert([values]);
+      const { error } = await query;
       if (error) throw error;
-      setProducts(data || []);
-    } catch (error: any) {
-      toast.error("Failed to fetch products.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    getProducts();
-  }, []);
-
-  const handleFormSubmit = async (productData: Partial<NewProductData>) => {
-    const toastId = toast.loading(editingProduct ? 'Updating product...' : 'Adding product...');
-    try {
-      if (editingProduct) {
-        const { error } = await supabase.from('products').update(productData).eq('id', editingProduct.id);
-        if (error) throw error;
-        toast.success("Product updated successfully!", { id: toastId });
-      } else {
-        const { error } = await supabase.from('products').insert([productData]).select();
-        if (error) throw error;
-        toast.success("Product added successfully!", { id: toastId });
-      }
-      closeFormModal();
+      toast.success(isEdit ? 'Updated!' : 'Added!', { id: toastId });
       getProducts();
-    } catch (error) {
-      console.error("Supabase error:", error);
-      toast.error("An error occurred.", { id: toastId });
+      setShowForm(false);
+      setEditingProduct(null);
+    } catch {
+      toast.error("Error while saving", { id: toastId });
     }
   };
 
-  const handleDeleteConfirm = async () => {
-    if (deletingProductId !== null) {
-      const toastId = toast.loading('Deleting product...');
-      try {
-        const { error } = await supabase.from('products').delete().eq('id', deletingProductId);
-        if (error) throw error;
-        toast.success("Product deleted successfully!", { id: toastId });
-        closeDeleteModal();
-        getProducts();
-      } catch (error) {
-        toast.error("Failed to delete product.", { id: toastId });
-      }
+  const handleDelete = async () => {
+    if (!deletingId) return;
+    const { error } = await supabase.from('products').delete().eq('id', deletingId);
+    if (!error) {
+      toast.success("Deleted");
+      getProducts();
+    } else {
+      toast.error("Failed to delete");
     }
+    setDeletingId(null);
   };
 
-  const openFormModal = (product: Product | null = null) => { setEditingProduct(product); };
-  const closeFormModal = () => { setEditingProduct(null); setIsFormModalOpen(false); };
-  const openDeleteModal = (id: number) => { setDeletingProductId(id); setIsDeleteModalOpen(true); };
-  const closeDeleteModal = () => { setDeletingProductId(null); setIsDeleteModalOpen(false); };
+  const openFormModal = (product: Product | null = null) => {
+    setEditingProduct(product);
+    setShowForm(true);
+  };
 
-  useEffect(() => {
-    if (editingProduct) setIsFormModalOpen(true);
-  }, [editingProduct]);
+  const openDeleteModal = (id: number) => setDeletingId(id);
 
-  const filteredProducts = useMemo(() => 
-    products.filter(product => 
-      (product.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-      (product.category?.toLowerCase() || '').includes(searchQuery.toLowerCase())
-    ), [products, searchQuery]);
-    
-  const columns: { key: keyof Product | 'actions'; label: string; render?: (...args: any) => React.ReactNode; sortable?: boolean; }[] = [
+  const columns: Column<Product>[] = [
     { key: "id", label: "ID", sortable: true },
     { key: "name", label: "Product Name", sortable: true },
     { key: "category", label: "Category", sortable: true },
     { key: "price", label: "Price", sortable: true },
     { key: "stock", label: "Stock", sortable: true },
     {
-      key: "actions", label: "Actions", sortable: false,
-      render: (_, row: Product) => (
+      key: "actions",
+      label: "Actions",
+      render: (_, row) => (
         <div className="flex gap-2">
           <motion.button onClick={() => openFormModal(row)} whileTap={{ scale: 0.9 }} className="p-2 text-cyan-400 hover:text-cyan-200"><Edit size={16} /></motion.button>
           <motion.button onClick={() => openDeleteModal(row.id)} whileTap={{ scale: 0.9 }} className="p-2 text-red-500 hover:text-red-400"><Trash2 size={16} /></motion.button>
         </div>
-      ),
-    },
+      )
+    }
   ];
-  
+
   return (
     <>
-      <Modal isOpen={isFormModalOpen} onClose={closeFormModal} title={editingProduct ? "Edit Product" : "Add New Product"}>
-        <ProductForm 
-            onSubmit={handleFormSubmit} 
-            onCancel={closeFormModal} 
-            initialData={editingProduct}
-            existingCategories={uniqueCategories}
-        />
+      <Modal isOpen={showForm} onClose={() => setShowForm(false)} title={editingProduct ? "Edit Product" : "Add Product"}>
+       <ProductForm
+  initialData={editingProduct}
+  onSubmit={handleSubmit}
+  onCancel={() => { setEditingProduct(null); setShowForm(false); }}
+/>
+
       </Modal>
-      <Modal isOpen={isDeleteModalOpen} onClose={closeDeleteModal} title="Confirm Deletion">
-        <div className="text-white text-center p-4">
-          <AlertTriangle className="text-red-500 w-12 h-12 mx-auto mb-4"/>
-          <p>Are you sure you want to delete this product?</p>
-          <div className="flex justify-center gap-4 pt-6">
-            <button onClick={closeDeleteModal} className="px-6 py-2 rounded-md bg-black/20 text-gray-300 hover:bg-black/40">Cancel</button>
-            <button onClick={handleDeleteConfirm} className="px-8 py-2 rounded-md font-semibold text-white bg-red-600 hover:bg-red-700">Delete</button>
+
+      <Modal isOpen={!!deletingId} onClose={() => setDeletingId(null)} title="Confirm Deletion">
+        <div className="p-4 text-white">
+          <AlertTriangle className="w-8 h-8 text-red-500 mx-auto mb-4" />
+          <p className="text-center">Are you sure you want to delete this product?</p>
+          <div className="flex justify-center gap-4 mt-6">
+            <button onClick={() => setDeletingId(null)} className="btn">Cancel</button>
+            <button onClick={handleDelete} className="btn bg-red-600">Delete</button>
           </div>
         </div>
       </Modal>
-      <div className="grid gap-6">
-        <Card className="bg-black/20 border border-purple-700/30 shadow-lg">
-          <CardHeader>
-            <PageHeader title="Products Management" buttonText="Add Product" searchPlaceholder="Search by name or category..." searchQuery={searchQuery} onSearchChange={setSearchQuery} onButtonClick={() => openFormModal()} />
-          </CardHeader>
-          <CardContent>
-            <AdminTable data={filteredProducts} columns={columns} isLoading={isLoading} />
-          </CardContent>
-        </Card>
-      </div>
+
+      <Card className="bg-black/20 border border-purple-700/30">
+        <CardHeader>
+          <PageHeader
+            title="Products Management"
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            buttonText="Add Product"
+            onButtonClick={() => setShowForm(true)}
+            searchPlaceholder="Search by name or category..."
+          />
+        </CardHeader>
+        <CardContent>
+          <AdminTable
+            data={products.filter(p =>
+              p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              p.category?.toLowerCase().includes(searchQuery.toLowerCase())
+            )}
+            columns={columns}
+            isLoading={isLoading}
+          />
+        </CardContent>
+      </Card>
     </>
   );
 };
